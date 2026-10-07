@@ -1,0 +1,10 @@
+{
+  "streams": [
+    {
+      "name": "time-logger",
+      "dslText": "time | log",
+      "originalDslText": "time | log",
+      "description": "Generates timestamps and logs the timestamps"
+    }
+  ]
+}

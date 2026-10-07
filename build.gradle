@@ -1,0 +1,83 @@
+plugins {
+    id 'java'
+    id 'application'
+    alias(libs.plugins.graalvm.native)
+}
+
+group = 'org.infosmid.stream'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+        nativeImageCapable = true
+    }
+}
+
+graalvmNative {
+    agent {
+        defaultMode = "standard"
+        enabled = true
+    }
+    binaries {
+        main {
+            imageName = 'stream-deployer'
+        }
+        configureEach {
+            resources.autodetect()
+            buildArgs.addAll([
+                    '--emit=build-report',
+                    '--no-fallback',
+                    '--enable-native-access=ALL-UNNAMED',
+                    '--initialize-at-build-time=org.slf4j.jdk.platform.logging.SLF4JSystemLoggerFinder',
+                    '--initialize-at-build-time=org.slf4j.jdk.platform.logging.SLF4JPlatformLogger',
+                    '--initialize-at-build-time=org.slf4j.jdk.platform.logging.SLF4JPlatformLoggerFactory',
+                    '--initialize-at-build-time=org.slf4j.helpers.NOPLogger',
+                    '--initialize-at-build-time=org.slf4j.jul.JDK14LoggerAdapter',
+                    '-H:+UnlockExperimentalVMOptions',
+                    '-H:+ForeignAPISupport',
+                    '-H:+SharedArenaSupport',
+            ])
+        }
+        test {
+            quickBuild = true
+            debug = false
+        }
+    }
+    metadataRepository {
+        enabled = true
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation(platform(libs.slf4j.bom))
+    implementation(platform(libs.jackson.bom))
+    implementation(platform(libs.junit.bom))
+
+    implementation libs.jspecify
+    implementation libs.picocli
+    implementation libs.kubernetes.client
+    implementation libs.jackson.databind
+    implementation libs.commons.io
+    implementation libs.bundles.slf4j.jul
+    
+    annotationProcessor libs.picocli.codegen
+    testAnnotationProcessor libs.picocli.codegen
+
+    testImplementation libs.jackson.dataformat.yaml
+    testImplementation libs.junit.jupiter
+    testImplementation libs.assertj.core
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'org.infosmid.stream.deployer.StreamDeployerApplication'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
