@@ -8,14 +8,11 @@ Before grepping or reading files to answer structural questions
 (who calls X, what does Y depend on, class/function relationships),
 first call the codegraphcontext mcp tools to add or query code structures, class hierarchies, callers 
 
-
-
 ## Knowledge
 Leverage `javadoccentral` mcp to obtain library reference information of the correct version of the relevant libraries according to version catalog.
 
 Leverage perplexity_ask, perplexity_research to obtain up-to-date information on apis and technologies, 
 and perplexity_reason to obtain answers to difficult problems.
- 
 
 ## Executing Builds and Tests
 

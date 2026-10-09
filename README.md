@@ -3,11 +3,46 @@
 Stream Deployer creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions.
 It resolves stream bindings and injects communication channels and groups into container arguments.
 
+The stream definition JSON:
+```json
+{
+  "streams": [
+    {
+      "name": "time-logger",
+      "dslText": "time | log",
+      "originalDslText": "time | log",
+      "description": "Generates timestamps and logs the timestamps"
+    }
+  ]
+}
+```
+
+will produce a diagram like below.
+
+```mermaid
+---
+title: time-logger - Generates timestamps and logs the timestamps
+---
+%%{init: {"theme": "dark", "themeCSS": ".label { color: white; font-weight: normal; display: inline-flex; align-items; center; justify-content: center; border-radius: 9999px; padding: 4px 12px; } .name { color: lightgrey; font-weight: normal; padding: 4px 12px; } .sink-node { background-color: #17242b; text-align: left; justify-content: left; margin-right: 16px; } .sink-node .label { background-color: #f5be00; } .source-node { background-color: #17242b; text-align: left; justify-content: left; margin-right: 16px; } .source-node .label { background-color: #0096ff; } "}}%%
+flowchart LR
+    time["<div class='source-node'><span class='name'>time</span><br><span class='label'>TIME</span></div>"]:::source
+    log["<div class='sink-node'><span class='name'>log</span><br><span class='label'>LOG</span></div>"]:::sink
+    time --> log
+
+    classDef source fill:#17242b,stroke:#0096ff,stroke-width:3px;
+    classDef sink fill:#17242b,stroke:#f5be00,stroke-width:3px;
+    class log sink;
+    class time source;
+
+    linkStyle default stroke-width:3px;
+
+```
+
 ## Requirements
 
 The project requires the following software:
 - Java 25 (SDKMAN or compatible JDK)
-- GraalVM with `native-image` (for native compilation only)
+- GraalVM with `native-image` (for native compilation and native testing)
 
 ## Running the Program
 
@@ -100,128 +135,160 @@ The directory contains:
 
 ### Build Native Distribution
 
-Compile a standalone native binary with GraalVM:
+You can compile a standalone native executable with GraalVM.
+The build requires GraalVM for JDK 25 with the `native-image` component installed.
+
+Run the following command to compile the native executable:
 
 ```bash
 ./gradlew nativeCompile
 ```
 
-Gradle compiles the binary into `build/native/nativeCompile/`.
-The output files include:
+Gradle uses the following build configuration:
+- Builds a standalone executable without fallback (`--no-fallback`).
+- Emits a build report with compilation statistics.
+- Uses GraalVM reachability metadata repository support.
+
+Gradle writes the output files to `build/native/nativeCompile/`:
 - `stream-deployer` (Executable binary on Linux and macOS)
 - `stream-deployer.exe` (Executable binary on Windows)
-- Shared library files (`.so` or `.dll`), if present
+- Shared library files (`.so`, `.dylib`, or `.dll`), if present
+
+### Run Native Tests
+
+You can compile and execute tests as a native image.
+Native tests verify application behavior and reachability metadata in a native environment.
+
+Run the following command to execute native tests:
+
+```bash
+./gradlew nativeTest
+```
+
+Gradle compiles test classes into a native executable and runs the tests.
+The test results and reports are saved to `build/reports/tests/nativeTest/`.
+
+### Generate Reachability Metadata
+
+The project uses GraalVM reachability metadata to configure reflection, serialization, and resources.
+Standard JVM tests run without the tracing agent to avoid test execution conflicts.
+
+When you add new dynamic dependencies or reflection code, collect updated metadata.
+
+1. Run the test suite with the native agent enabled:
+
+   ```bash
+   ./gradlew -Pagent test
+   ```
+
+   The agent records dynamic access and writes configuration files to `build/native/agent-output/test/`.
+
+2. Copy the generated metadata into the project source tree:
+
+   ```bash
+   ./gradlew metadataCopy --task test --dir src/main/resources/META-INF/native-image
+   ```
+
+3. Review the updated JSON files in `src/main/resources/META-INF/native-image/` and commit them to version control.
+
+## Installing Locally
+
+You can install either the JVM distribution or the native binary to your local user environment.
+
+The project provides two Gradle tasks for local installation:
+- `installLocalJvm`: Builds the JVM distribution and copies launcher scripts and libraries.
+- `installLocalNative`: Compiles the GraalVM native binary and copies executable files and shared libraries.
+
+### Default Installation Paths
+
+The installation tasks use the following default paths:
+
+- **Linux and macOS**:
+  - Binaries and scripts: `$HOME/.local/bin`
+  - JVM libraries: `$HOME/.local/lib`
+- **Windows**:
+  - Binaries and scripts: `%LOCALAPPDATA%\Programs\stream-deployer\bin`
+  - JVM libraries: `%LOCALAPPDATA%\Programs\stream-deployer\lib`
+
+You can change the target installation directory with the `-PinstallDir=<path>` option:
+
+```bash
+./gradlew installLocalJvm -PinstallDir="$HOME/custom-tools"
+```
 
 ## Installing on Linux and macOS
 
-You can install either the JVM distribution or the native binary.
-
 ### Install JVM Build on Linux and macOS
 
-1. Run the Gradle `installDist` task:
+1. Run the `installLocalJvm` task:
    ```bash
-   ./gradlew installDist
+   ./gradlew installLocalJvm
    ```
-2. Create the destination directories:
-   ```bash
-   mkdir -p "$HOME/.local/bin" "$HOME/.local/lib"
-   ```
-3. Copy the launcher script to `$HOME/.local/bin`:
-   ```bash
-   cp build/install/stream-deployer/bin/stream-deployer "$HOME/.local/bin/"
-   ```
-4. Copy the libraries to `$HOME/.local/lib`:
-   ```bash
-   cp -r build/install/stream-deployer/lib "$HOME/.local/"
-   ```
-5. Ensure `$HOME/.local/bin` is in your `PATH` variable:
+   This task runs `installDist`, creates `$HOME/.local/bin` and `$HOME/.local/lib` if necessary, and copies the application files.
+
+2. Ensure `$HOME/.local/bin` is in your `PATH` environment variable:
    ```bash
    export PATH="$HOME/.local/bin:$PATH"
    ```
-6. Verify the installation:
+
+3. Verify the installation:
    ```bash
    stream-deployer --help
    ```
 
-You can also copy the distribution folder and link the binary:
-```bash
-cp -r build/install/stream-deployer "$HOME/.local/"
-ln -sf "$HOME/.local/stream-deployer/bin/stream-deployer" "$HOME/.local/bin/stream-deployer"
-```
-
 ### Install Native Build on Linux and macOS
 
-1. Compile the native image:
+1. Run the `installLocalNative` task:
    ```bash
-   ./gradlew nativeCompile
+   ./gradlew installLocalNative
    ```
-2. Create the destination directory:
-   ```bash
-   mkdir -p "$HOME/.local/bin"
-   ```
-3. Copy the executable binary to `$HOME/.local/bin`:
-   ```bash
-   cp build/native/nativeCompile/stream-deployer "$HOME/.local/bin/"
-   ```
-4. Copy any shared library files (`.so` files) if present:
-   ```bash
-   cp build/native/nativeCompile/*.so "$HOME/.local/bin/" 2>/dev/null || true
-   ```
-5. Set execute permissions on the binary:
-   ```bash
-   chmod +x "$HOME/.local/bin/stream-deployer"
-   ```
-6. Ensure `$HOME/.local/bin` is in your `PATH` variable.
-7. Verify the installation:
+   This task runs `nativeCompile`, creates `$HOME/.local/bin` if necessary, copies `stream-deployer` and shared libraries (`.so`, `.dylib`), and sets executable permissions (`0755`).
+
+2. Ensure `$HOME/.local/bin` is in your `PATH` environment variable.
+
+3. Verify the installation:
    ```bash
    stream-deployer --help
    ```
 
 ## Installing on Windows
 
-You can install either the JVM distribution or the native binary on Windows.
-
 ### Install JVM Build on Windows
 
-1. Run the Gradle `installDist` task in Command Prompt or PowerShell:
+1. Run the `installLocalJvm` task in Command Prompt or PowerShell:
    ```cmd
-   gradlew.bat installDist
+   gradlew.bat installLocalJvm
    ```
-2. Copy the unpacked directory to your chosen installation path:
+   This task runs `installDist`, creates `%LOCALAPPDATA%\Programs\stream-deployer\bin` and `lib` directories if necessary, and copies the files.
+
+2. Add the binary directory to your `PATH` environment variable:
    ```cmd
-   xcopy /E /I build\install\stream-deployer "%USERPROFILE%\.local\stream-deployer"
+   setx PATH "%LOCALAPPDATA%\Programs\stream-deployer\bin;%PATH%"
    ```
-3. Add the `bin` directory to your `PATH` environment variable:
-   ```cmd
-   setx PATH "%USERPROFILE%\.local\stream-deployer\bin;%PATH%"
-   ```
-4. Open a new terminal window to refresh environment variables.
-5. Verify the installation:
+
+3. Open a new terminal window to refresh environment variables.
+
+4. Verify the installation:
    ```cmd
    stream-deployer.bat --help
    ```
 
 ### Install Native Build on Windows
 
-1. Compile the native image in Command Prompt or PowerShell:
+1. Run the `installLocalNative` task in Command Prompt or PowerShell:
    ```cmd
-   gradlew.bat nativeCompile
+   gradlew.bat installLocalNative
    ```
-2. Create your local bin directory if it does not exist:
+   This task runs `nativeCompile`, creates `%LOCALAPPDATA%\Programs\stream-deployer\bin` if necessary, and copies `stream-deployer.exe` and any dynamic library files (`.dll`).
+
+2. Add the binary directory to your `PATH` environment variable if necessary:
    ```cmd
-   if not exist "%USERPROFILE%\.local\bin" mkdir "%USERPROFILE%\.local\bin"
+   setx PATH "%LOCALAPPDATA%\Programs\stream-deployer\bin;%PATH%"
    ```
-3. Copy the executable and any DLL files to your local bin directory:
-   ```cmd
-   copy build\native\nativeCompile\stream-deployer.exe "%USERPROFILE%\.local\bin\"
-   copy build\native\nativeCompile\*.dll "%USERPROFILE%\.local\bin\" 2>nul
-   ```
-4. Add `%USERPROFILE%\.local\bin` to your `PATH` environment variable if necessary:
-   ```cmd
-   setx PATH "%USERPROFILE%\.local\bin;%PATH%"
-   ```
-5. Open a new terminal window.
-6. Verify the installation:
+
+3. Open a new terminal window.
+
+4. Verify the installation:
    ```cmd
    stream-deployer --help
    ```
