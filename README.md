@@ -3,6 +3,8 @@
 Stream Deployer creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions.
 It resolves stream bindings and injects communication channels and groups into container arguments.
 
+The DSL parser code was copied from archived [Spring Cloud Data Flow](https://github.com/spring-attic/spring-cloud-dataflow)
+
 The stream definition JSON:
 ```json
 {
