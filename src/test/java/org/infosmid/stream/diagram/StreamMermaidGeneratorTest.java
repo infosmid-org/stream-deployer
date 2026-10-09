@@ -2,6 +2,7 @@ package org.infosmid.stream.dsl;
 
 import java.util.List;
 
+import org.infosmid.stream.diagram.StreamMermaidGenerator;
 import org.junit.jupiter.api.Test;
 
 import org.infosmid.stream.core.StreamDefinition;
@@ -16,8 +17,8 @@ public class StreamMermaidGeneratorTest {
         String diagram = StreamMermaidGenerator.generate("time | log");
 
         assertThat(diagram).contains("flowchart LR\n");
-        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>SOURCE</span></div>\"]:::source");
-        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>SINK</span></div>\"]:::sink");
+        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>TIME</span></div>\"]:::source");
+        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>LOG</span></div>\"]:::sink");
         assertThat(diagram).contains("time --> log");
         assertThat(diagram).contains("classDef source fill:#17242b,stroke:#0096ff,stroke-width:3px;");
         assertThat(diagram).contains("classDef sink fill:#17242b,stroke:#f5be00,stroke-width:3px;");
@@ -29,10 +30,10 @@ public class StreamMermaidGeneratorTest {
     public void testMultiAppStream() {
         String diagram = StreamMermaidGenerator.generate("time | filter | transform | log");
 
-        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>SOURCE</span></div>\"]:::source");
-        assertThat(diagram).contains("filter[\"<div class='processor-node'><span class='name'>filter</span><br><span class='label'>PROCESSOR</span></div>\"]:::processor");
-        assertThat(diagram).contains("transform[\"<div class='processor-node'><span class='name'>transform</span><br><span class='label'>PROCESSOR</span></div>\"]:::processor");
-        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>SINK</span></div>\"]:::sink");
+        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>TIME</span></div>\"]:::source");
+        assertThat(diagram).contains("filter[\"<div class='processor-node'><span class='name'>filter</span><br><span class='label'>FILTER</span></div>\"]:::processor");
+        assertThat(diagram).contains("transform[\"<div class='processor-node'><span class='name'>transform</span><br><span class='label'>TRANSFORM</span></div>\"]:::processor");
+        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>LOG</span></div>\"]:::sink");
         assertThat(diagram).contains("time --> filter");
         assertThat(diagram).contains("filter --> transform");
         assertThat(diagram).contains("transform --> log");
@@ -42,8 +43,8 @@ public class StreamMermaidGeneratorTest {
     public void testSourceToNamedDestination() {
         String diagram = StreamMermaidGenerator.generate("time | filter > :TIME_LOG");
 
-        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>SOURCE</span></div>\"]:::source");
-        assertThat(diagram).contains("filter[\"<div class='processor-node'><span class='name'>filter</span><br><span class='label'>PROCESSOR</span></div>\"]:::processor");
+        assertThat(diagram).contains("time[\"<div class='source-node'><span class='name'>time</span><br><span class='label'>TIME</span></div>\"]:::source");
+        assertThat(diagram).contains("filter[\"<div class='processor-node'><span class='name'>filter</span><br><span class='label'>FILTER</span></div>\"]:::processor");
         assertThat(diagram).contains("dest_TIME_LOG(\"<div class='destination-node'><span class='name'>TIME_LOG</span><br><span class='label'>DESTINATION</span></div>\"):::destination");
         assertThat(diagram).contains("time --> filter");
         assertThat(diagram).contains("filter --> dest_TIME_LOG");
@@ -54,7 +55,7 @@ public class StreamMermaidGeneratorTest {
         String diagram = StreamMermaidGenerator.generate(":TIME_LOG > log");
 
         assertThat(diagram).contains("dest_TIME_LOG(\"<div class='destination-node'><span class='name'>TIME_LOG</span><br><span class='label'>DESTINATION</span></div>\"):::destination");
-        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>SINK</span></div>\"]:::sink");
+        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>LOG</span></div>\"]:::sink");
         assertThat(diagram).contains("dest_TIME_LOG --> log");
     }
 
@@ -63,7 +64,7 @@ public class StreamMermaidGeneratorTest {
         String diagram = StreamMermaidGenerator.generate(":stream1.time > log");
 
         assertThat(diagram).contains("tap_stream1_time(\"<div class='tap-node'><span class='name'>stream1.time</span><br><span class='label'>TAP</span></div>\"):::tap");
-        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>SINK</span></div>\"]:::sink");
+        assertThat(diagram).contains("log[\"<div class='sink-node'><span class='name'>log</span><br><span class='label'>LOG</span></div>\"]:::sink");
         assertThat(diagram).contains("tap_stream1_time --> log");
     }
 
@@ -72,7 +73,7 @@ public class StreamMermaidGeneratorTest {
         String diagram = StreamMermaidGenerator.generate(":SOURCE_DEST > bridge > :SINK_DEST");
 
         assertThat(diagram).contains("dest_SOURCE_DEST(\"<div class='destination-node'><span class='name'>SOURCE_DEST</span><br><span class='label'>DESTINATION</span></div>\"):::destination");
-        assertThat(diagram).contains("bridge[\"<div class='processor-node'><span class='name'>bridge</span><br><span class='label'>PROCESSOR</span></div>\"]:::processor");
+        assertThat(diagram).contains("bridge[\"<div class='processor-node'><span class='name'>bridge</span><br><span class='label'>BRIDGE</span></div>\"]:::processor");
         assertThat(diagram).contains("dest_SINK_DEST(\"<div class='destination-node'><span class='name'>SINK_DEST</span><br><span class='label'>DESTINATION</span></div>\"):::destination");
         assertThat(diagram).contains("dest_SOURCE_DEST --> bridge");
         assertThat(diagram).contains("bridge --> dest_SINK_DEST");
@@ -82,7 +83,7 @@ public class StreamMermaidGeneratorTest {
     public void testStandaloneApp() {
         String diagram = StreamMermaidGenerator.generate("timestamp");
 
-        assertThat(diagram).contains("timestamp[\"<div class='app-node'><span class='name'>timestamp</span><br><span class='label'>APP</span></div>\"]:::app");
+        assertThat(diagram).contains("timestamp[\"<div class='app-node'><span class='name'>timestamp</span><br><span class='label'>TIMESTAMP</span></div>\"]:::app");
         assertThat(diagram).doesNotContain("-->");
         assertThat(diagram).doesNotContain("linkStyle");
     }
@@ -90,11 +91,11 @@ public class StreamMermaidGeneratorTest {
     @Test
     public void testMultipleStreamsReconciliation() {
         List<StreamDefinition> streams = List.of(
-                new StreamDefinition("time-publisher", "time | filter > :TIME_LOG"),
-                new StreamDefinition("publish-logs", ":TIME_LOG > log")
+                new StreamDefinition("time-publisher", "time publisher", "time | filter > :TIME_LOG"),
+                new StreamDefinition("publish-logs", "publish logs", ":TIME_LOG > log")
         );
 
-        String diagram = StreamMermaidGenerator.generate("time-logger", streams);
+        String diagram = StreamMermaidGenerator.generate("time-logger", "time logger", streams);
 
         assertThat(diagram).contains("subgraph time_publisher [\"time-publisher\"]");
         assertThat(diagram).contains("subgraph publish_logs [\"publish-logs\"]");
@@ -106,11 +107,11 @@ public class StreamMermaidGeneratorTest {
     @Test
     public void testMultipleStreamsWithTap() {
         List<StreamDefinition> streams = List.of(
-                new StreamDefinition("stream1", "time | log"),
-                new StreamDefinition("stream2", ":stream1.time > log")
+                new StreamDefinition("stream1", "time logger", "time | log"),
+                new StreamDefinition("stream2", "time logger", ":stream1.time > log")
         );
 
-        String diagram = StreamMermaidGenerator.generate("time-logger", streams);
+        String diagram = StreamMermaidGenerator.generate("time-logger", "time logger", streams);
 
         assertThat(diagram).contains("subgraph stream1 [\"stream1\"]");
         assertThat(diagram).contains("subgraph stream2 [\"stream2\"]");
@@ -122,10 +123,10 @@ public class StreamMermaidGeneratorTest {
 
     @Test
     public void testNodeHelper() {
-        String result = StreamMermaidGenerator.node("myApp", "source");
-        assertThat(result).isEqualTo("<div class='source-node'><span class='name'>myApp</span><br><span class='label'>SOURCE</span></div>");
+        String result = StreamMermaidGenerator.node("myApp", "myApp", "source");
+        assertThat(result).isEqualTo("<div class='source-node'><span class='name'>myApp</span><br><span class='label'>MYAPP</span></div>");
 
-        String destResult = StreamMermaidGenerator.node("myDest", "DESTINATION");
+        String destResult = StreamMermaidGenerator.node("myDest", "myDest","DESTINATION");
         assertThat(destResult).isEqualTo("<div class='destination-node'><span class='name'>myDest</span><br><span class='label'>DESTINATION</span></div>");
     }
 
@@ -157,7 +158,7 @@ public class StreamMermaidGeneratorTest {
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> StreamMermaidGenerator.generate((StreamNode) null))
                 .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> StreamMermaidGenerator.generate(null, (List<StreamDefinition>) null))
+        assertThatThrownBy(() -> StreamMermaidGenerator.generate(null, null, (List<StreamDefinition>) null))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> StreamMermaidGenerator.generateFromNodes(null, null))
                 .isInstanceOf(NullPointerException.class);

@@ -14,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 import org.infosmid.stream.dsl.AppNode;
 import org.infosmid.stream.dsl.StreamNode;
 import org.infosmid.stream.dsl.StreamParser;
+import org.infosmid.stream.kubernetes.KubernetesPropertyResolver;
 import org.infosmid.stream.kubernetes.KubernetesResourceGenerator;
 
 public class StreamDeployerCore {
@@ -22,6 +23,7 @@ public class StreamDeployerCore {
     private final KubernetesResourceGenerator resourceGenerator;
     private final StreamParser streamParser;
     private final StreamBindingResolver streamBindingResolver;
+    private final StreamDefinitionValidator streamDefinitionValidator;
 
     public StreamDeployerCore(@NonNull KubernetesResourceGenerator resourceGenerator) {
         this(resourceGenerator, new StreamParser(), new StreamBindingResolver());
@@ -43,9 +45,23 @@ public class StreamDeployerCore {
             @NonNull KubernetesResourceGenerator resourceGenerator,
             @NonNull StreamParser streamParser,
             @NonNull StreamBindingResolver streamBindingResolver) {
+        this(resourceGenerator, streamParser, streamBindingResolver, new StreamDefinitionValidator(streamParser, streamBindingResolver));
+    }
+
+    public StreamDeployerCore(
+            @NonNull KubernetesResourceGenerator resourceGenerator,
+            @NonNull StreamParser streamParser,
+            @NonNull StreamBindingResolver streamBindingResolver,
+            @NonNull StreamDefinitionValidator streamDefinitionValidator) {
         this.resourceGenerator = Objects.requireNonNull(resourceGenerator, "resourceGenerator must not be null");
         this.streamParser = Objects.requireNonNull(streamParser, "streamParser must not be null");
         this.streamBindingResolver = Objects.requireNonNull(streamBindingResolver, "streamBindingResolver must not be null");
+        this.streamDefinitionValidator = Objects.requireNonNull(streamDefinitionValidator, "streamDefinitionValidator must not be null");
+    }
+
+    @NonNull
+    public StreamDefinitionValidator getStreamDefinitionValidator() {
+        return streamDefinitionValidator;
     }
     @NonNull
     public List<Object> deployStreams(
@@ -61,28 +77,21 @@ public class StreamDeployerCore {
 
             logger.fine(() -> String.format("Deploying stream '%s' with DSL: %s", streamName, dslText));
 
-            StreamNode streamNode = streamParser.parse(streamName, dslText);
+            StreamNode streamNode = streamParser.parse(streamName, streamDef.description(), dslText);
+            streamDefinitionValidator.validate(streamName, streamNode, metadataProperties);
+
             List<StreamBindingResolver.ResolvedAppBindings> resolvedApps =
                     streamBindingResolver.resolve(streamName, streamNode);
 
             for (StreamBindingResolver.ResolvedAppBindings resolvedApp : resolvedApps) {
                 String label = resolvedApp.label();
-                String image = metadataProperties != null ? metadataProperties.getProperty("app." + label) : null;
-                if (image == null && metadataProperties != null) {
-                    image = metadataProperties.getProperty(label);
+                AppNode appNode = findAppNode(streamNode, label);
+                if (appNode == null) {
+                    throw new IllegalStateException("AppNode not found for label: " + label);
                 }
-                if (image == null && metadataProperties != null) {
-                    AppNode appNode = findAppNode(streamNode, label);
-                    if (appNode != null) {
-                        image = metadataProperties.getProperty("app." + appNode.getName());
-                        if (image == null) {
-                            image = metadataProperties.getProperty(appNode.getName());
-                        }
-                    }
-                }
-                if (image == null) {
-                    throw new IllegalArgumentException("No image metadata found for app: " + label);
-                }
+                String image = streamDefinitionValidator.resolveImage(
+                        streamName, appNode, resolvedApp.appType(), metadataProperties
+                );
 
                 // 1. Initialize with generated stream bindings & coordinates (lowest precedence)
                 Map<String, String> appProperties = new LinkedHashMap<>(resolvedApp.bindingProperties());
@@ -91,20 +100,19 @@ public class StreamDeployerCore {
                 appProperties.putAll(resolvedApp.literalArguments());
 
                 // 3. Merge wildcard deployment properties (app.*.)
-                mergeProperties(appProperties, deploymentProperties, "app.*.");
                 mergeProperties(appProperties, metadataProperties, "app.*.");
+                mergeProperties(appProperties, deploymentProperties, "app.*.");
 
                 // 4. Merge specific deployment properties (app.<label>.) (highest precedence)
-                mergeProperties(appProperties, deploymentProperties, "app." + label + ".");
                 mergeProperties(appProperties, metadataProperties, "app." + label + ".");
+                mergeProperties(appProperties, deploymentProperties, "app." + label + ".");
 
-                // Deployment coordinates
-                Map<String, String> appDeploymentProperties = new LinkedHashMap<>();
+                // Deployment coordinates and resolved deployer properties
+                Map<String, String> appDeploymentProperties = KubernetesPropertyResolver.resolveDeploymentProperties(
+                        metadataProperties, deploymentProperties, label
+                );
                 appDeploymentProperties.put("spring.cloud.deployer.group", streamName);
                 appDeploymentProperties.put("spring.cloud.deployer.kubernetes.appName", streamName + "-" + label);
-
-                // Merge deployer properties
-                mergeDeploymentProperties(deploymentProperties, appDeploymentProperties, label);
 
                 allResources.addAll(resourceGenerator.generateResources(streamName, label, image, appProperties, appDeploymentProperties));
             }
