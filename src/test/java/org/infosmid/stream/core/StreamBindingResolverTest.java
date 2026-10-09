@@ -12,13 +12,13 @@ public class StreamBindingResolverTest {
 
     private final StreamBindingResolver resolver = new StreamBindingResolver();
 
-    private StreamNode parse(String name, String dsl) {
-        return new StreamParser(name, dsl).parse();
+    private StreamNode parse(String name, String description, String dsl) {
+        return new StreamParser(name, description, dsl).parse();
     }
 
     @Test
     public void testScenario1StandardLinearTwoAppPipeline() {
-        StreamNode streamNode = parse("time-logger", "time | log");
+        StreamNode streamNode = parse("time-logger", "time logger", "time | log");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("time-logger", streamNode);
 
         assertThat(resolved).hasSize(2);
@@ -54,7 +54,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario2MultiAppPipelineProcessorChain() {
-        StreamNode streamNode = parse("multi-stream", "http | filter | transform | log");
+        StreamNode streamNode = parse("multi-stream", "multi stream", "http | filter | transform | log");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("multi-stream", streamNode);
 
         assertThat(resolved).hasSize(4);
@@ -100,7 +100,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario3SourceToNamedDestinationChannel() {
-        StreamNode streamNode = parse("time-publisher", "time > :TIME_LOG");
+        StreamNode streamNode = parse("time-publisher", "time publisher", "time > :TIME_LOG");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("time-publisher", streamNode);
 
         assertThat(resolved).hasSize(1);
@@ -117,7 +117,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario4NamedDestinationChannelToSink() {
-        StreamNode streamNode = parse("publish-logs", ":TIME_LOG > log");
+        StreamNode streamNode = parse("publish-logs", "publish logs", ":TIME_LOG > log");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("publish-logs", streamNode);
 
         assertThat(resolved).hasSize(1);
@@ -135,7 +135,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario5NamedDestinationWithExplicitConsumerGroup() {
-        StreamNode streamNode = parse("custom-logs", ":TIME_LOG --group=my_group > log");
+        StreamNode streamNode = parse("custom-logs", "custom logs", ":TIME_LOG --group=my_group > log");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("custom-logs", streamNode);
 
         assertThat(resolved).hasSize(1);
@@ -149,7 +149,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario6ContentTypeArgumentTranslation() {
-        StreamNode streamNode = parse("content-type-stream", "time --outputType=application/json --fixed-delay=5 | log --inputType=application/json --level=WARN");
+        StreamNode streamNode = parse("content-type-stream", "content type stream", "time --outputType=application/json --fixed-delay=5 | log --inputType=application/json --level=WARN");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("content-type-stream", streamNode);
 
         assertThat(resolved).hasSize(2);
@@ -173,7 +173,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testScenario7SingleUnboundStreamApplication() {
-        StreamNode streamNode = parse("standalone-app", "timestamp");
+        StreamNode streamNode = parse("standalone-app",  "standalone app", "timestamp");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("standalone-app", streamNode);
 
         assertThat(resolved).hasSize(1);
@@ -190,7 +190,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testNamedSourceToNamedSinkWithSingleProcessor() {
-        StreamNode streamNode = parse("bridge-stream", ":SOURCE_DEST > bridge > :SINK_DEST");
+        StreamNode streamNode = parse("bridge-stream", "bridge stream", ":SOURCE_DEST > bridge > :SINK_DEST");
         List<StreamBindingResolver.ResolvedAppBindings> resolved = resolver.resolve("bridge-stream", streamNode);
 
         assertThat(resolved).hasSize(1);
@@ -206,7 +206,7 @@ public class StreamBindingResolverTest {
 
     @Test
     public void testNullSafety() {
-        assertThatThrownBy(() -> resolver.resolve(null, parse("test", "time | log")))
+        assertThatThrownBy(() -> resolver.resolve(null, parse("test", null,"time | log")))
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> resolver.resolve("test", null))
                 .isInstanceOf(NullPointerException.class);

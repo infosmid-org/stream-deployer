@@ -26,6 +26,7 @@ public class StreamNode extends AstNode {
 	protected final String streamText;
 
 	protected final String streamName;
+	protected final String streamDescription;
 
 	protected final List<AppNode> appNodes;
 
@@ -33,11 +34,18 @@ public class StreamNode extends AstNode {
 
 	protected SinkDestinationNode sinkDestinationNode;
 
-	public StreamNode(String streamText, String streamName, List<AppNode> appNodes,
-			SourceDestinationNode sourceDestinationNode, SinkDestinationNode sinkDestinationNode) {
+	public StreamNode(
+		String streamText,
+		String streamName,
+		String streamDescription,
+		List<AppNode> appNodes,
+		SourceDestinationNode sourceDestinationNode,
+		SinkDestinationNode sinkDestinationNode
+	) {
 		super(appNodes.get(0).getStartPos(), appNodes.get(appNodes.size() - 1).getEndPos());
 		this.streamText = streamText;
 		this.streamName = streamName;
+		this.streamDescription = streamDescription;
 		this.appNodes = appNodes;
 		this.sourceDestinationNode = sourceDestinationNode;
 		this.sinkDestinationNode = sinkDestinationNode;
@@ -105,6 +113,10 @@ public class StreamNode extends AstNode {
 
 	public String getStreamName() {
 		return streamName;
+	}
+
+	public String getStreamDescription() {
+		return streamDescription;
 	}
 
 	/**

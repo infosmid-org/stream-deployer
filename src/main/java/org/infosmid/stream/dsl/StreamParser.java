@@ -40,12 +40,13 @@ public class StreamParser extends AppParser {
 	 * Stream DSL text.
 	 */
 	private final String dsl;
+	private final String description;
 
 	/**
 	 * Construct a default {@code StreamParser}.
 	 */
 	public StreamParser() {
-		this(null, "");
+		this(null, null, "");
 	}
 
 	/**
@@ -56,7 +57,7 @@ public class StreamParser extends AppParser {
 	 * @param dsl the stream definition DSL text
 	 */
 	public StreamParser(String dsl) {
-		this(null, dsl);
+		this(null, null, dsl);
 	}
 
 	/**
@@ -65,10 +66,11 @@ public class StreamParser extends AppParser {
 	 * @param name stream name
 	 * @param dsl stream dsl text
 	 */
-	public StreamParser(String name, String dsl) {
+	public StreamParser(String name, String description, String dsl) {
 		super(new Tokenizer().getTokens(dsl));
 		this.name = name;
 		this.dsl = dsl;
+		this.description = description;
 	}
 
 	/**
@@ -79,8 +81,8 @@ public class StreamParser extends AppParser {
 	 * @return the AST for the parsed stream
 	 * @throws ParseException thrown if expression fails parsing.
 	 */
-	public StreamNode parse(String name, String dsl) {
-		return new StreamParser(name, dsl).parse();
+	public StreamNode parse(String name, String description, String dsl) {
+		return new StreamParser(name, description, dsl).parse();
 	}
 
 	/**
@@ -188,7 +190,7 @@ public class StreamParser extends AppParser {
 			tokens.raiseException(t.startPos, errorMessage, toString(t));
 		}
 		String finalStreamName = streamName != null ? streamName : this.name;
-		return makeStreamNode(tokens.getExpression(), finalStreamName, appNodes, sourceDestinationNode, sinkDestinationNode);
+		return makeStreamNode(tokens.getExpression(), finalStreamName, null, appNodes, sourceDestinationNode, sinkDestinationNode);
 	}
 
 	/**
@@ -442,9 +444,9 @@ public class StreamParser extends AppParser {
 		return new DestinationNode(startpos, endPos, destinationName, argumentNodes);
 	}
 
-	protected StreamNode makeStreamNode(String streamText, String streamName, List<AppNode> appNodes,
+	protected StreamNode makeStreamNode(String streamText, String streamName, String streamDescription, List<AppNode> appNodes,
 			SourceDestinationNode sourceDestinationNode, SinkDestinationNode sinkDestinationNode) {
-		return new StreamNode(streamText, streamName, appNodes, sourceDestinationNode, sinkDestinationNode);
+		return new StreamNode(streamText, streamName, streamDescription, appNodes, sourceDestinationNode, sinkDestinationNode);
 	}
 
 }
