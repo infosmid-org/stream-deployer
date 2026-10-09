@@ -17,7 +17,7 @@ java {
 graalvmNative {
     agent {
         defaultMode = "standard"
-        enabled = true
+        enabled = project.hasProperty('agent')
     }
     binaries {
         main {
@@ -78,6 +78,55 @@ application {
     mainClass = 'org.infosmid.stream.deployer.StreamDeployerApplication'
 }
 
-tasks.named('test') {
+test {
     useJUnitPlatform()
+}
+
+// Determine target installation directory based on operating system
+boolean isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
+String defaultInstallDir = isWindows ?
+        (System.getenv('LOCALAPPDATA') ?: "${System.getProperty('user.home')}/AppData/Local") + '/Programs/stream-deployer' :
+        "${System.getProperty('user.home')}/.local"
+
+File localBaseDir = file(project.findProperty('localInstallDir') ?: project.findProperty('installDir') ?: defaultInstallDir)
+File localBinDir = new File(localBaseDir, 'bin')
+
+// Task to install JVM distribution artifacts
+tasks.register('installLocalJvm', Copy) {
+    group = 'distribution'
+    description = 'Installs JVM distribution artifacts to the local directory.'
+    dependsOn tasks.named('installDist')
+
+    doFirst {
+        localBinDir.mkdirs()
+        new File(localBaseDir, 'lib').mkdirs()
+    }
+
+    from(tasks.named('installDist'))
+    into(localBaseDir)
+
+    filesMatching('bin/*') {
+        permissions {
+            unix(0755)
+        }
+    }
+}
+
+// Task to install GraalVM native binary and shared libraries
+tasks.register('installLocalNative', Copy) {
+    group = 'distribution'
+    description = 'Installs native distribution artifacts to the local bin directory.'
+    dependsOn tasks.named('nativeCompile')
+
+    doFirst {
+        localBinDir.mkdirs()
+    }
+
+    from(tasks.named('nativeCompile'))
+    into(localBinDir)
+    include 'stream-deployer', 'stream-deployer.exe', '*.so', '*.dylib', '*.dll'
+
+    filePermissions {
+        unix(0755)
+    }
 }

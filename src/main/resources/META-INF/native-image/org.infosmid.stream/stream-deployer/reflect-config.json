@@ -22,6 +22,14 @@
     "allDeclaredFields": true
   },
   {
+    "name": "org.infosmid.stream.core.StreamDefinitionValidator",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
     "name": "org.infosmid.stream.core.StreamBindingResolver$ResolvedAppBindings",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
@@ -167,6 +175,70 @@
   },
   {
     "name": "org.infosmid.stream.kubernetes.TCPSocketActionRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.EnvFromSourceRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.SecretEnvSourceRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.ConfigMapEnvSourceRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.EnvVarSourceRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.SecretKeySelectorRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.ConfigMapKeySelectorRecord",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.KubernetesPropertyResolver$SecretKeyRef",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.infosmid.stream.kubernetes.KubernetesPropertyResolver$ConfigMapKeyRef",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredMethods": true,
