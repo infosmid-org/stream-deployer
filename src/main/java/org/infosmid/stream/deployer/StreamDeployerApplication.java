@@ -1,3 +1,18 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.infosmid.stream.deployer;
 
 import java.io.File;
@@ -19,7 +34,7 @@ import picocli.CommandLine.Option;
 
 import org.infosmid.stream.core.StreamDefinition;
 import org.infosmid.stream.core.StreamDeployerCore;
-import org.infosmid.stream.dsl.StreamMermaidGenerator;
+import org.infosmid.stream.diagram.StreamMermaidGenerator;
 import org.infosmid.stream.kubernetes.KubernetesResourceGenerator;
 import org.infosmid.stream.kubernetes.KubernetesResourceHelper;
 
@@ -80,16 +95,17 @@ public class StreamDeployerApplication implements Callable<Integer> {
         }
 
         List<StreamDefinition> streamDefinitions = streamDefinitionsRaw.stream()
-                .map(m -> new StreamDefinition(m.get("name"), m.get("dslText")))
+                .map(m -> new StreamDefinition(m.get("name"), m.get("description"), m.get("dslText")))
                 .toList();
 
         if (generateDiagram) {
             String streamName = streamDefinitions.size() == 1 ? streamDefinitions.getFirst().getName() : baseName;
-            String diagram = StreamMermaidGenerator.generate(streamName, streamDefinitions);
+            String streamDescription = streamDefinitions.getFirst().description();
+            String diagram = StreamMermaidGenerator.generate(streamName, streamDescription, streamDefinitions);
             try (FileWriter writer = new FileWriter(diagramFile)) {
                 writer.write(diagram);
             }
-            System.out.println("Mermaid diagram generated in " + diagramFile);
+            System.out.println("Mermaid diagram for " + streamName + " - " + streamDescription + " generated in " + diagramFile);
         }
 
         if (generateOutput) {

@@ -2,8 +2,8 @@
   "streams": [
     {
       "name": "time-publisher",
-      "dslText": "time | filter > :TIME_LOG",
-      "originalDslText": "time | filter > :TIME_LOG",
+      "dslText": "Timer: time | filter > :TIME_LOG",
+      "originalDslText": "Timer: time | filter > :TIME_LOG",
       "description": "Generates timestamps and publishes to TIME_LOG"
     }
   ]

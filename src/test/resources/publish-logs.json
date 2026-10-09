@@ -3,8 +3,7 @@
     {
       "name": "publish-logs",
       "dslText": ":TIME_LOG > log",
-      "originalDslText": ":TIME_LOG > log",
-      "description": "publish TIME_LOG"
+      "originalDslText": ":TIME_LOG > log"
     }
   ]
 }

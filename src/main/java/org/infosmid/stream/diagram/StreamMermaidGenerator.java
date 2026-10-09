@@ -1,4 +1,19 @@
-package org.infosmid.stream.dsl;
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.infosmid.stream.diagram;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,11 +27,14 @@ import java.util.Map;
 import static java.util.Map.*;
 
 import java.util.Objects;
-import java.util.Set;
-import java.util.Spliterator;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import org.infosmid.stream.dsl.AppNode;
+import org.infosmid.stream.dsl.SinkDestinationNode;
+import org.infosmid.stream.dsl.SourceDestinationNode;
+import org.infosmid.stream.dsl.StreamNode;
+import org.infosmid.stream.dsl.StreamParser;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -46,10 +64,11 @@ public class StreamMermaidGenerator {
 
 
     @NonNull
-    public static String node(@NonNull String name, @NonNull String nodeType) {
+    public static String node(@NonNull String name, @NonNull String appName, @NonNull String nodeType) {
         Objects.requireNonNull(name, "name must not be null");
         Objects.requireNonNull(nodeType, "nodeType must not be null");
         String lowerType = nodeType.toLowerCase(Locale.ROOT);
+        String typeLabel = lowerType.equals("destination") || lowerType.equals("tap") ? lowerType : appName;
         return new StringBuilder()
             .append("<div class='")
             .append(lowerType)
@@ -60,7 +79,7 @@ public class StreamMermaidGenerator {
             .append("</span>")
             .append("<br>")
             .append("<span class='label'>")
-            .append(nodeType.toUpperCase(Locale.ROOT))
+            .append(typeLabel.toUpperCase(Locale.ROOT))
             .append("</span>")
             .append("</div>")
             .toString();
@@ -69,29 +88,29 @@ public class StreamMermaidGenerator {
     @NonNull
     public static String generate(@NonNull StreamDefinition streamDefinition) {
         Objects.requireNonNull(streamDefinition, "streamDefinition must not be null");
-        return generate(streamDefinition.getName(), Collections.singletonList(streamDefinition));
+        return generate(streamDefinition.getName(), streamDefinition.description(), Collections.singletonList(streamDefinition));
     }
 
     @NonNull
     public static String generate(@NonNull StreamNode streamNode) {
         Objects.requireNonNull(streamNode, "streamNode must not be null");
-        return generateFromNodes(streamNode.streamName, Collections.singletonList(streamNode));
+        return generateFromNodes(streamNode.getStreamName(), streamNode.getStreamDescription(), Collections.singletonList(streamNode));
     }
 
     @NonNull
-    public static String generate(@Nullable String streamName, @NonNull String dslText) {
+    public static String generate(@Nullable String streamName, String description, @NonNull String dslText) {
         Objects.requireNonNull(dslText, "dslText must not be null");
-        StreamNode streamNode = new StreamParser(streamName, dslText).parse();
+        StreamNode streamNode = new StreamParser(streamName, description, dslText).parse();
         return generate(streamNode);
     }
 
     @NonNull
     public static String generate(@NonNull String dslText) {
-        return generate(null, dslText);
+        return generate(null, null, dslText);
     }
 
     @NonNull
-    public static String generate(String streamName, @NonNull List<StreamDefinition> streamDefinitions) {
+    public static String generate(String streamName, String description, @NonNull List<StreamDefinition> streamDefinitions) {
         Objects.requireNonNull(streamDefinitions, "streamDefinitions must not be null");
         List<StreamNode> streamNodes = new ArrayList<>(streamDefinitions.size());
         for (StreamDefinition def : streamDefinitions) {
@@ -100,23 +119,24 @@ public class StreamMermaidGenerator {
             if (dsl == null) {
                 throw new IllegalArgumentException("StreamDefinition dslText must not be null");
             }
-            StreamNode node = new StreamParser(name, dsl).parse();
+            StreamNode node = new StreamParser(name, description, dsl).parse();
             streamNodes.add(node);
         }
-        return generateFromNodes(streamName, streamNodes);
+        return generateFromNodes(streamName, description, streamNodes);
     }
 
     @NonNull
-    public static String generateFromNodes(String streamName, @NonNull List<StreamNode> streamNodes) {
+    public static String generateFromNodes(String streamName, String description, @NonNull List<StreamNode> streamNodes) {
         Objects.requireNonNull(streamNodes, "streamNodes must not be null");
         boolean useSubgraphs = streamNodes.size() > 1;
-        return generateFromNodes(streamName, streamNodes, useSubgraphs);
+        return generateFromNodes(streamName, description, streamNodes, useSubgraphs);
     }
 
     @NonNull
-    public static String generateFromNodes(String inputStreamName, @NonNull List<StreamNode> streamNodes, boolean useSubgraphs) {
+    public static String generateFromNodes(String inputStreamName, String description, @NonNull List<StreamNode> streamNodes, boolean useSubgraphs) {
         Objects.requireNonNull(streamNodes, "streamNodes must not be null");
         Map<String, String> nodeTypeMappings = new HashMap<>();
+        String streamDescription = description;
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart LR\n");
         Map<String, String> knownApps = new LinkedHashMap<>();
@@ -135,14 +155,16 @@ public class StreamMermaidGenerator {
 
         List<String> tapLinks = new ArrayList<>();
         int linkCount = 0;
-
         for (StreamNode sn : streamNodes) {
             String streamName = sn.getStreamName();
             String indent = useSubgraphs ? "        " : "    ";
 
             if (useSubgraphs) {
                 String subgraphId = streamName != null ? sanitize(streamName) : "stream_" + Integer.toHexString(sn.hashCode());
-                String subgraphTitle = streamName != null ? streamName : "Stream";
+                String subgraphTitle = streamName != null ? streamName : sn.getStreamDescription();
+                if(sn.getStreamDescription() != null && !sn.getStreamDescription().isBlank()) {
+                    subgraphTitle = subgraphTitle != null ? subgraphTitle + " - " + sn.getStreamDescription() : sn.getStreamDescription();
+                }
                 sb.append("    subgraph ").append(subgraphId).append(" [\"").append(subgraphTitle).append("\"]\n");
             }
 
@@ -158,7 +180,7 @@ public class StreamMermaidGenerator {
                 String nodeType = isTap ? "tap" : "destination";
 
                 sourceNodeId = (isTap ? "tap_" : "dest_") + sanitize(destName);
-                sb.append(indent).append(sourceNodeId).append("(\"").append(node(destName, nodeType)).append("\"):::").append(nodeType).append("\n");
+                sb.append(indent).append(sourceNodeId).append("(\"").append(node(destName, sourceDest.getDestinationName(), nodeType)).append("\"):::").append(nodeType).append("\n");
                 nodeTypeMappings.put(sourceNodeId, nodeType);
                 if (isTap && knownApps.containsKey(destName)) {
                     String targetAppId = knownApps.get(destName);
@@ -175,7 +197,7 @@ public class StreamMermaidGenerator {
                     ? sanitize(streamName) + "_" + sanitize(labelName)
                     : sanitize(labelName);
                 appNodeIds.add(appId);
-                sb.append(indent).append(appId).append("[\"").append(node(labelName, nodeType)).append("\"]:::").append(nodeType).append("\n");
+                sb.append(indent).append(appId).append("[\"").append(node(labelName, app.getName(), nodeType)).append("\"]:::").append(nodeType).append("\n");
                 nodeTypeMappings.put(appId, nodeType);
             }
 
@@ -185,7 +207,7 @@ public class StreamMermaidGenerator {
                 boolean isTap = isTap(destName);
                 String nodeType = isTap ? "tap" : "destination";
                 sinkNodeId = (isTap ? "tap_" : "dest_") + sanitize(destName);
-                sb.append(indent).append(sinkNodeId).append("(\"").append(node(destName, nodeType)).append("\"):::").append(nodeType).append("\n");
+                sb.append(indent).append(sinkNodeId).append("(\"").append(node(destName, destName, nodeType)).append("\"):::").append(nodeType).append("\n");
                 nodeTypeMappings.put(sinkNodeId, nodeType);
             }
 
@@ -259,6 +281,10 @@ public class StreamMermaidGenerator {
         if (inputStreamName != null && !inputStreamName.isBlank()) {
             diagram.append("---\ntitle: ");
             diagram.append(inputStreamName);
+            if(streamDescription != null && !streamDescription.isBlank()) {
+                diagram.append(" - ");
+                diagram.append(streamDescription);
+            }
             diagram.append("\n---\n");
         }
         diagram.append(THEME_CSS_START);
