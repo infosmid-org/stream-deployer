@@ -163,6 +163,66 @@ public class KubernetesResourceHelperTest {
     }
 
     @Test
+    public void testDeploymentWithEnvFromAndValueFrom() {
+        ContainerRecord container = new ContainerRecord(
+                "my-app", "my-image:latest",
+                List.of(
+                        new EnvVarRecord("PLAIN_VAR", "plain-val"),
+                        new EnvVarRecord("DB_PASS", null, EnvVarSourceRecord.ofSecretKey("db-secret", "password")),
+                        new EnvVarRecord("CM_VAL", null, EnvVarSourceRecord.ofConfigMapKey("cm-data", "key1"))
+                ),
+                null, null, null, null, null, null, null, "IfNotPresent",
+                List.of(
+                        EnvFromSourceRecord.ofSecret("rabbit-access"),
+                        EnvFromSourceRecord.ofConfigMap("app-config")
+                )
+        );
+
+        PodSpecRecord podSpec = new PodSpecRecord(
+                List.of(container),
+                null, null, "Always", null, 30L
+        );
+
+        DeploymentRecord deployment = new DeploymentRecord(
+                "env-deploy", 1,
+                Map.of("app", "test"),
+                Map.of("app", "test"),
+                null,
+                podSpec
+        );
+
+        HasMetadata result = KubernetesResourceHelper.convert(deployment);
+        assertThat(result).isInstanceOf(Deployment.class);
+
+        Deployment dep = (Deployment) result;
+        var c = dep.getSpec().getTemplate().getSpec().getContainers().get(0);
+
+        assertThat(c.getEnvFrom()).hasSize(2);
+        assertThat(c.getEnvFrom().get(0).getSecretRef().getName()).isEqualTo("rabbit-access");
+        assertThat(c.getEnvFrom().get(1).getConfigMapRef().getName()).isEqualTo("app-config");
+
+        assertThat(c.getEnv()).hasSize(3);
+        assertThat(c.getEnv().get(0).getName()).isEqualTo("PLAIN_VAR");
+        assertThat(c.getEnv().get(0).getValue()).isEqualTo("plain-val");
+
+        assertThat(c.getEnv().get(1).getName()).isEqualTo("DB_PASS");
+        assertThat(c.getEnv().get(1).getValueFrom().getSecretKeyRef().getName()).isEqualTo("db-secret");
+        assertThat(c.getEnv().get(1).getValueFrom().getSecretKeyRef().getKey()).isEqualTo("password");
+
+        assertThat(c.getEnv().get(2).getName()).isEqualTo("CM_VAL");
+        assertThat(c.getEnv().get(2).getValueFrom().getConfigMapKeyRef().getName()).isEqualTo("cm-data");
+        assertThat(c.getEnv().get(2).getValueFrom().getConfigMapKeyRef().getKey()).isEqualTo("key1");
+
+        String yaml = Serialization.asYaml(dep);
+        assertThat(yaml).contains("envFrom:");
+        assertThat(yaml).contains("rabbit-access");
+        assertThat(yaml).contains("app-config");
+        assertThat(yaml).contains("db-secret");
+        assertThat(yaml).contains("password");
+        assertThat(yaml).contains("cm-data");
+    }
+
+    @Test
     public void testNullSafetyDefensiveGuards() {
         PodSpecRecord minimalPodSpec = new PodSpecRecord(
                 List.of(new ContainerRecord("minimal", "image", null, null, null, null, null, null, null, null, null)),

@@ -15,7 +15,14 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLParser;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
+import org.infosmid.stream.core.StreamDefinition;
+import org.infosmid.stream.core.StreamDeployerCore;
+import org.infosmid.stream.kubernetes.DeploymentRecord;
+import org.infosmid.stream.kubernetes.KubernetesResourceGenerator;
+import java.util.Properties;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class StreamDeployerIntegrationTest {
     @Test
@@ -77,6 +84,10 @@ public class StreamDeployerIntegrationTest {
             "--spring.cloud.stream.bindings.output.producer.requiredGroups=time-logger"
         );
 
+        assertThat(getContainerEnvFromSecrets(timeDeployment)).containsExactly(
+            "rabbit-access", "minio-access", "neo4j-access", "postgresql-access"
+        );
+
         // Assertions for log service
         JsonNode logService = findResource(documents, "Service", "time-logger-log");
         assertThat(logService.path("kind").asText()).isEqualTo("Service");
@@ -96,6 +107,10 @@ public class StreamDeployerIntegrationTest {
             "--spring.cloud.dataflow.stream.name=time-logger",
             "--spring.cloud.stream.bindings.input.destination=time-logger.time",
             "--spring.cloud.stream.bindings.input.group=time-logger"
+        );
+
+        assertThat(getContainerEnvFromSecrets(logDeployment)).containsExactly(
+            "rabbit-access", "minio-access", "neo4j-access", "postgresql-access"
         );
     }
 
@@ -130,7 +145,7 @@ public class StreamDeployerIntegrationTest {
         assertThat(diagramFile).exists();
         String diagramContent = Files.readString(diagramFile.toPath());
         assertThat(diagramContent).contains(
-            "<div class='source-node'><span class='name'>time</span>",
+            "<div class='source-node'><span class='name'>Timer</span>",
             "<div class='processor-node'><span class='name'>filter</span>",
             "<div class='destination-node'><span class='name'>TIME_LOG</span>"
         );
@@ -139,23 +154,23 @@ public class StreamDeployerIntegrationTest {
         assertThat(documents).hasSize(4);
 
         // Assertions for time service
-        JsonNode timeService = findResource(documents, "Service", "time-publisher-time");
+        JsonNode timeService = findResource(documents, "Service", "time-publisher-timer");
         assertThat(timeService.path("kind").asText()).isEqualTo("Service");
-        assertThat(timeService.path("metadata").path("name").asText()).isEqualTo("time-publisher-time");
+        assertThat(timeService.path("metadata").path("name").asText()).isEqualTo("time-publisher-timer");
         assertThat(getServicePorts(timeService)).contains(8080);
 
         // Assertions for time deployment
-        JsonNode timeDeployment = findResource(documents, "Deployment", "time-publisher-time");
+        JsonNode timeDeployment = findResource(documents, "Deployment", "time-publisher-timer");
         assertThat(timeDeployment.path("kind").asText()).isEqualTo("Deployment");
-        assertThat(timeDeployment.path("metadata").path("name").asText()).isEqualTo("time-publisher-time");
+        assertThat(timeDeployment.path("metadata").path("name").asText()).isEqualTo("time-publisher-timer");
         assertThat(getContainerPorts(timeDeployment)).contains(8080);
 
         List<String> timeArgs = getContainerArgs(timeDeployment);
         assertThat(timeArgs).contains(
-            "--spring.cloud.dataflow.stream.app.label=time",
+            "--spring.cloud.dataflow.stream.app.label=Timer",
             "--spring.cloud.dataflow.stream.app.type=source",
             "--spring.cloud.dataflow.stream.name=time-publisher",
-            "--spring.cloud.stream.bindings.output.destination=time-publisher.time",
+            "--spring.cloud.stream.bindings.output.destination=time-publisher.Timer",
             "--spring.cloud.stream.bindings.output.producer.requiredGroups=time-publisher"
         );
 
@@ -177,7 +192,7 @@ public class StreamDeployerIntegrationTest {
             "--spring.cloud.dataflow.stream.app.label=filter",
             "--spring.cloud.dataflow.stream.app.type=processor",
             "--spring.cloud.dataflow.stream.name=time-publisher",
-            "--spring.cloud.stream.bindings.input.destination=time-publisher.time",
+            "--spring.cloud.stream.bindings.input.destination=time-publisher.Timer",
             "--spring.cloud.stream.bindings.input.group=time-publisher",
             "--spring.cloud.stream.bindings.output.destination=TIME_LOG"
         );
@@ -268,6 +283,126 @@ public class StreamDeployerIntegrationTest {
         );
     }
 
+    @Test
+    public void testSecretAndConfigMapRefsAndKeyRefs() throws Exception {
+        Path tempDir = Files.createTempDirectory("stream-deployer-test");
+        Path definitionFile = tempDir.resolve("stream-def.json");
+        Path propertiesFile = tempDir.resolve("deployer.properties");
+        Path metadataFile = tempDir.resolve("metadata.properties");
+        Path outputFile = tempDir.resolve("output.yaml");
+
+        Files.writeString(definitionFile, """
+            {
+              "streams": [
+                {
+                  "name": "my-stream",
+                  "dslText": "time | log"
+                }
+              ]
+            }
+            """);
+
+        Files.writeString(metadataFile, """
+            app.source.time=springcloudstream/time-source-rabbit:main
+            app.sink.log=springcloudstream/log-sink-rabbit:main
+            deployer.*.kubernetes.secretRefs=default-sec
+            deployer.*.kubernetes.configMapRefs=[cm-default1, cm-default2]
+            deployer.*.kubernetes.secretKeyRefs=[{envVarName: 'SECRET_VAR', secretName: 'sec1', dataKey: 'key1'}]
+            deployer.*.kubernetes.configMapKeyRefs=CM_VAR=cm1:k1
+            """);
+
+        Files.writeString(propertiesFile, """
+            deployer.time.kubernetes.secretRef=time-sec
+            deployer.time.kubernetes.configMapRef=time-cm
+            deployer.time.kubernetes.secretKeyRefs=SECRET_VAR=sec-override:key-override, TIME_SPECIFIC=sec-time:key-time
+            """);
+
+        StreamDeployerApplication application = new StreamDeployerApplication();
+        int exitCode = new CommandLine(application).execute(
+                "--definition=" + definitionFile,
+                "--properties=" + propertiesFile,
+                "--metadata=" + metadataFile,
+                "--output=" + outputFile
+        );
+
+        assertThat(exitCode).isEqualTo(0);
+        assertThat(outputFile).exists();
+
+        List<JsonNode> documents = parseYamlDocuments(outputFile.toFile());
+        assertThat(documents).hasSize(4);
+
+        // Verify 'time' deployment (has app-level overrides)
+        JsonNode timeDeployment = findResource(documents, "Deployment", "my-stream-time");
+        JsonNode timeContainer = timeDeployment.path("spec").path("template").path("spec").path("containers").get(0);
+
+        List<String> timeEnvFromSecrets = new ArrayList<>();
+        List<String> timeEnvFromConfigMaps = new ArrayList<>();
+        timeContainer.path("envFrom").forEach(entry -> {
+            if (entry.has("secretRef")) {
+                timeEnvFromSecrets.add(entry.path("secretRef").path("name").asText());
+            }
+            if (entry.has("configMapRef")) {
+                timeEnvFromConfigMaps.add(entry.path("configMapRef").path("name").asText());
+            }
+        });
+        assertThat(timeEnvFromSecrets).containsExactlyInAnyOrder("time-sec","default-sec");
+        assertThat(timeEnvFromConfigMaps).containsExactlyInAnyOrder("time-cm","cm-default1", "cm-default2");
+
+        // Verify 'time' env vars (override by variable name)
+        JsonNode timeEnv = timeContainer.path("env");
+        JsonNode secretVarNode = findEnvVar(timeEnv, "SECRET_VAR");
+        assertThat(secretVarNode).isNotNull();
+        assertThat(secretVarNode.path("valueFrom").path("secretKeyRef").path("name").asText()).isEqualTo("sec-override");
+        assertThat(secretVarNode.path("valueFrom").path("secretKeyRef").path("key").asText()).isEqualTo("key-override");
+
+        JsonNode timeVarNode = findEnvVar(timeEnv, "TIME_SPECIFIC");
+        assertThat(timeVarNode).isNotNull();
+        assertThat(timeVarNode.path("valueFrom").path("secretKeyRef").path("name").asText()).isEqualTo("sec-time");
+        assertThat(timeVarNode.path("valueFrom").path("secretKeyRef").path("key").asText()).isEqualTo("key-time");
+
+        JsonNode cmVarNode = findEnvVar(timeEnv, "CM_VAR");
+        assertThat(cmVarNode).isNotNull();
+        assertThat(cmVarNode.path("valueFrom").path("configMapKeyRef").path("name").asText()).isEqualTo("cm1");
+        assertThat(cmVarNode.path("valueFrom").path("configMapKeyRef").path("key").asText()).isEqualTo("k1");
+
+        // Verify 'log' deployment (uses deployer wildcard defaults)
+        JsonNode logDeployment = findResource(documents, "Deployment", "my-stream-log");
+        JsonNode logContainer = logDeployment.path("spec").path("template").path("spec").path("containers").get(0);
+
+        List<String> logEnvFromSecrets = new ArrayList<>();
+        List<String> logEnvFromConfigMaps = new ArrayList<>();
+        logContainer.path("envFrom").forEach(entry -> {
+            if (entry.has("secretRef")) {
+                logEnvFromSecrets.add(entry.path("secretRef").path("name").asText());
+            }
+            if (entry.has("configMapRef")) {
+                logEnvFromConfigMaps.add(entry.path("configMapRef").path("name").asText());
+            }
+        });
+        assertThat(logEnvFromSecrets).containsExactly("default-sec");
+        assertThat(logEnvFromConfigMaps).containsExactly("cm-default1", "cm-default2");
+    }
+
+    private JsonNode findEnvVar(JsonNode envArray, String name) {
+        for (JsonNode entry : envArray) {
+            if (name.equals(entry.path("name").asText())) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private List<String> getContainerEnvFromSecrets(JsonNode deploymentDoc) {
+        JsonNode containers = deploymentDoc.path("spec").path("template").path("spec").path("containers");
+        List<String> secrets = new ArrayList<>();
+        containers.get(0).path("envFrom").forEach(entry -> {
+            if (entry.has("secretRef")) {
+                secrets.add(entry.path("secretRef").path("name").asText());
+            }
+        });
+        return secrets;
+    }
+
     private List<JsonNode> parseYamlDocuments(File file) throws IOException {
         YAMLMapper mapper = new YAMLMapper();
         try (YAMLParser parser = mapper.getFactory().createParser(file)) {
@@ -308,5 +443,51 @@ public class StreamDeployerIntegrationTest {
         List<String> args = new ArrayList<>();
         containers.get(0).path("args").forEach(arg -> args.add(arg.asText()));
         return args;
+    }
+
+    @Test
+    public void testStreamDeployerCoreTypeMismatchValidation() {
+        StreamDeployerCore core = new StreamDeployerCore(new KubernetesResourceGenerator());
+        List<StreamDefinition> streamDefinitions = List.of(new StreamDefinition("inverted", "inverted log time", "log | time"));
+        Properties metadata = new Properties();
+        metadata.setProperty("app.source.time", "image-time");
+        metadata.setProperty("app.sink.log", "image-log");
+
+        assertThatThrownBy(() -> core.deployStreams(streamDefinitions, new Properties(), metadata))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Application 'log' in stream 'inverted' is defined as type 'sink', but is used as 'source'.");
+    }
+
+    @Test
+    public void testStreamDeployerCoreUntypedImageThrows() {
+        StreamDeployerCore core = new StreamDeployerCore(new KubernetesResourceGenerator());
+        List<StreamDefinition> streamDefinitions = List.of(new StreamDefinition("untyped", "untyped","time | log"));
+        Properties metadata = new Properties();
+        metadata.setProperty("app.time", "image-time");
+        metadata.setProperty("app.log", "image-log");
+
+        assertThatThrownBy(() -> core.deployStreams(streamDefinitions, new Properties(), metadata))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("No image metadata found for app: time");
+    }
+
+    @Test
+    public void testStreamDeployerCoreLabelOverride() {
+        StreamDeployerCore core = new StreamDeployerCore(new KubernetesResourceGenerator());
+        List<StreamDefinition> streamDefinitions = List.of(new StreamDefinition("labeled", "labeled", "customTime: time | log"));
+        Properties metadata = new Properties();
+        metadata.setProperty("app.source.time", "default-time-img");
+        metadata.setProperty("app.source.customTime", "override-time-img");
+        metadata.setProperty("app.sink.log", "log-img");
+
+        List<Object> resources = core.deployStreams(streamDefinitions, new Properties(), metadata);
+        DeploymentRecord timeDeployment = resources.stream()
+                .filter(r -> r instanceof DeploymentRecord d && d.name().equals("labeled-customtime"))
+                .map(r -> (DeploymentRecord) r)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(timeDeployment.podSpec().containers().get(0).image())
+                .isEqualTo("override-time-img");
     }
 }

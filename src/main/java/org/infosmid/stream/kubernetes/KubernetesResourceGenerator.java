@@ -99,6 +99,27 @@ public class KubernetesResourceGenerator {
         env.add(new EnvVarRecord("SPRING_CLOUD_APPLICATION_GROUP", streamName));
         env.add(new EnvVarRecord("SPRING_DEPLOYMENT_ID", appId));
 
+        List<KubernetesPropertyResolver.SecretKeyRef> secretKeyRefs = KubernetesPropertyResolver.getSecretKeyRefs(deploymentProperties);
+        for (KubernetesPropertyResolver.SecretKeyRef ref : secretKeyRefs) {
+            env.add(new EnvVarRecord(ref.envVarName(), null, EnvVarSourceRecord.ofSecretKey(ref.secretName(), ref.dataKey())));
+        }
+
+        List<KubernetesPropertyResolver.ConfigMapKeyRef> configMapKeyRefs = KubernetesPropertyResolver.getConfigMapKeyRefs(deploymentProperties);
+        for (KubernetesPropertyResolver.ConfigMapKeyRef ref : configMapKeyRefs) {
+            env.add(new EnvVarRecord(ref.envVarName(), null, EnvVarSourceRecord.ofConfigMapKey(ref.configMapName(), ref.dataKey())));
+        }
+
+        List<String> secretRefs = KubernetesPropertyResolver.getSecretRefs(deploymentProperties);
+        List<String> configMapRefs = KubernetesPropertyResolver.getConfigMapRefs(deploymentProperties);
+
+        List<EnvFromSourceRecord> envFrom = new ArrayList<>();
+        for (String secret : secretRefs) {
+            envFrom.add(EnvFromSourceRecord.ofSecret(secret));
+        }
+        for (String configMap : configMapRefs) {
+            envFrom.add(EnvFromSourceRecord.ofConfigMap(configMap));
+        }
+
         List<String> args = new ArrayList<>();
         appProperties.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -134,7 +155,8 @@ public class KubernetesResourceGenerator {
         ContainerRecord container = new ContainerRecord(
             appId, image, env, args, Collections.singletonList(containerPort),
             new ResourceRequirementsRecord(limits, requests),
-            null, null, null, Collections.emptyList(), imagePullPolicy
+            null, null, null, Collections.emptyList(), imagePullPolicy,
+            envFrom.isEmpty() ? null : envFrom
         );
 
         List<String> imagePullSecrets = new ArrayList<>();

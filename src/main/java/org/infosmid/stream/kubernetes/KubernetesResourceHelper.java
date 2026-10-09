@@ -9,7 +9,10 @@ import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerPortBuilder;
 import io.fabric8.kubernetes.api.model.EmptyDirVolumeSourceBuilder;
+import io.fabric8.kubernetes.api.model.EnvFromSource;
+import io.fabric8.kubernetes.api.model.EnvFromSourceBuilder;
 import io.fabric8.kubernetes.api.model.EnvVar;
+import io.fabric8.kubernetes.api.model.EnvVarSourceBuilder;
 import io.fabric8.kubernetes.api.model.ExecActionBuilder;
 import io.fabric8.kubernetes.api.model.HTTPGetActionBuilder;
 import io.fabric8.kubernetes.api.model.HasMetadata;
@@ -192,7 +195,13 @@ public class KubernetesResourceHelper {
 
                         if (c.env() != null) {
                             cb.withEnv(c.env().stream()
-                                    .map(e -> new EnvVar(e.name(), e.value(), null))
+                                    .map(KubernetesResourceHelper::convertEnvVar)
+                                    .collect(Collectors.toList()));
+                        }
+
+                        if (c.envFrom() != null && !c.envFrom().isEmpty()) {
+                            cb.withEnvFrom(c.envFrom().stream()
+                                    .map(KubernetesResourceHelper::convertEnvFrom)
                                     .collect(Collectors.toList()));
                         }
 
@@ -236,6 +245,39 @@ public class KubernetesResourceHelper {
             builder.withContainers(containers);
         }
 
+        return builder.build();
+    }
+
+    private static EnvVar convertEnvVar(EnvVarRecord e) {
+        if (e.valueFrom() != null) {
+            EnvVarSourceBuilder evsb = new EnvVarSourceBuilder();
+            if (e.valueFrom().secretKeyRef() != null) {
+                evsb.withNewSecretKeyRef()
+                        .withName(e.valueFrom().secretKeyRef().name())
+                        .withKey(e.valueFrom().secretKeyRef().key())
+                        .endSecretKeyRef();
+            } else if (e.valueFrom().configMapKeyRef() != null) {
+                evsb.withNewConfigMapKeyRef()
+                        .withName(e.valueFrom().configMapKeyRef().name())
+                        .withKey(e.valueFrom().configMapKeyRef().key())
+                        .endConfigMapKeyRef();
+            }
+            return new EnvVar(e.name(), e.value(), evsb.build());
+        }
+        return new EnvVar(e.name(), e.value(), null);
+    }
+
+    private static EnvFromSource convertEnvFrom(EnvFromSourceRecord r) {
+        EnvFromSourceBuilder builder = new EnvFromSourceBuilder();
+        if (r.secretRef() != null) {
+            builder.withNewSecretRef()
+                    .withName(r.secretRef().name())
+                    .endSecretRef();
+        } else if (r.configMapRef() != null) {
+            builder.withNewConfigMapRef()
+                    .withName(r.configMapRef().name())
+                    .endConfigMapRef();
+        }
         return builder.build();
     }
 
