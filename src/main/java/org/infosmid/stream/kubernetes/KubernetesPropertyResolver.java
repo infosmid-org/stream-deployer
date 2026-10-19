@@ -26,9 +26,10 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.fasterxml.jackson.databind.JsonNode;
+
 import io.fabric8.kubernetes.client.utils.Serialization;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.JsonNode;
 
 public class KubernetesPropertyResolver {
 
