@@ -5,7 +5,12 @@ plugins {
 }
 
 group = 'org.infosmid.stream'
-version = '1.0.0-SNAPSHOT'
+def getVersionFromFile() {
+    def versionFile = new File(rootProject.projectDir, 'version.txt')
+    return versionFile.text.trim()
+}
+version = providers.gradleProperty('releaseVersion').getOrNull() ?: getVersionFromFile()
+description = 'Creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions'
 
 java {
     toolchain {
@@ -81,6 +86,7 @@ application {
 test {
     useJUnitPlatform()
 }
+
 
 // Determine target installation directory based on operating system
 boolean isWindows = System.getProperty('os.name').toLowerCase().contains('windows')
