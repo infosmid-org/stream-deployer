@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'application'
     alias(libs.plugins.graalvm.native)
+    alias(libs.plugins.gradle.offline)
 }
 
 group = 'org.infosmid.stream'

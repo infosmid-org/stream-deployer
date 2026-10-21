@@ -60,9 +60,9 @@ gradle-app.setting
 # Cache of project
 .gradletasknamecache
 
-# Eclipse Gradle plugin generated files
-# Eclipse Core
-.project
-# JDT-specific (Eclipse Java Development Tools)
-.classpath
 
+/.idea/AndroidProjectSystem.xml
+/commit.sh
+/commit.md
+/test-results-native/test/TEST-junit-jupiter.xml
+/time-logger.mmd

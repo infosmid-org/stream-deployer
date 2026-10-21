@@ -33,3 +33,4 @@ slf4j-jul = ["slfj4-jdk-platform-logging", "slfj4-api", "slfj4-jdk14", "slfj4-jc
 
 [plugins]
 graalvm-native = { id = "org.graalvm.buildtools.native", version.ref = "native-plugin" }
+gradle-offline = { id = "org.infosmid.plugins.gradle-offline-deps", version = "1.0.0" }

@@ -52,13 +52,7 @@ The project requires the following software:
 
 ## Running the Program
 
-Run the application with Gradle or with the compiled binary.
-
-### Run with Gradle
-
-```bash
-./gradlew run --args="--definition=src/test/resources/time-logger.json --properties=src/test/resources/time-logger.properties --metadata=src/test/resources/stream-metadata.properties"
-```
+Run the application with JVM Distribution or with the compiled binary.
 
 ### Command-Line Options
 
