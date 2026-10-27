@@ -1,17 +1,40 @@
+import org.commonmark.ext.autolink.AutolinkExtension
+import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
+import org.commonmark.ext.gfm.tables.TablesExtension
+import org.commonmark.ext.heading.anchor.HeadingAnchorExtension
+import org.commonmark.parser.Parser
+import org.commonmark.renderer.html.HtmlRenderer
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.commonmark:commonmark:0.24.0'
+        classpath 'org.commonmark:commonmark-ext-gfm-tables:0.24.0'
+        classpath 'org.commonmark:commonmark-ext-autolink:0.24.0'
+        classpath 'org.commonmark:commonmark-ext-gfm-strikethrough:0.24.0'
+        classpath 'org.commonmark:commonmark-ext-heading-anchor:0.24.0'
+    }
+}
+
 plugins {
     id 'java'
     id 'application'
+    id 'maven-publish'
     alias(libs.plugins.graalvm.native)
     alias(libs.plugins.gradle.offline)
 }
 
-group = 'org.infosmid.stream'
+group = 'org.infosmid'
 def getVersionFromFile() {
     def versionFile = new File(rootProject.projectDir, 'version.txt')
     return versionFile.text.trim()
 }
 version = providers.gradleProperty('releaseVersion').getOrNull() ?: getVersionFromFile()
-description = 'Creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions'
+def projectName = 'Stream Deployer'
+def projectDescription = 'Creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions'
+description = projectDescription
 
 java {
     toolchain {
@@ -70,7 +93,7 @@ dependencies {
     implementation libs.jackson.databind
     implementation libs.commons.io
     implementation libs.bundles.slf4j.jul
-    
+
     annotationProcessor libs.picocli.codegen
     testAnnotationProcessor libs.picocli.codegen
 
@@ -137,3 +160,227 @@ tasks.register('installLocalNative', Copy) {
         unix(0755)
     }
 }
+
+publishing {
+    repositories {
+        maven {
+            name = 'GitHubPackages'
+            url = uri("https://maven.pkg.github.com/infosmid-org/${rootProject.name}")
+            credentials {
+                username = providers.environmentVariable('GITHUB_ACTOR').getOrElse('')
+                password = providers.environmentVariable('GITHUB_TOKEN').getOrElse('')
+            }
+        }
+    }
+    publications {
+        documentation(MavenPublication) {
+            artifactId = "${rootProject.name}-doc"
+        }
+    }
+}
+
+tasks.withType(PublishToMavenRepository).configureEach {
+    if (publication.name == 'documentation') {
+        onlyIf { repository.name == 'GitHubPackages' }
+    }
+}
+
+// Stage guide files: render README.md to index.html and include assets
+def guideDir = layout.buildDirectory.dir('site-docs/guide')
+def siteDocsGuide = tasks.register('siteDocsGuide') {
+    group = 'documentation'
+    description = 'Generates HTML documentation from README.md and stages assets for site docs.'
+    inputs.file('README.md')
+    inputs.files(fileTree(projectDir) {
+        include '*.svg'
+        include '*.png'
+    })
+    outputs.dir(guideDir)
+
+    doLast {
+        def targetDir = guideDir.get().asFile
+        targetDir.mkdirs()
+
+        copy {
+            from(projectDir) {
+                include '*.svg'
+                include '*.png'
+            }
+            into targetDir
+        }
+
+        def readmeFile = file('README.md')
+        def extensions = [
+			TablesExtension.create(),
+			AutolinkExtension.create(),
+			StrikethroughExtension.create(),
+			HeadingAnchorExtension.create()
+        ]
+        def parser = Parser.builder().extensions(extensions).build()
+        def renderer = HtmlRenderer.builder().extensions(extensions).build()
+        def document = parser.parse(readmeFile.text)
+        def htmlBody = renderer.render(document)
+
+        def htmlPage = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${projectName}</title>
+    <style>
+        :root {
+            --color-canvas-default: #ffffff;
+            --color-canvas-subtle: #f6f8fa;
+            --color-fg-default: #1f2328;
+            --color-fg-muted: #656d76;
+            --color-border-default: #d0d7de;
+            --color-border-muted: #d8dee4;
+            --color-accent-fg: #0969da;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-canvas-default: #0d1117;
+                --color-canvas-subtle: #161b22;
+                --color-fg-default: #e6edf3;
+                --color-fg-muted: #848d97;
+                --color-border-default: #30363d;
+                --color-border-muted: #21262d;
+                --color-accent-fg: #2f81f7;
+            }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            background-color: var(--color-canvas-default);
+            color: var(--color-fg-default);
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+        a {
+            color: var(--color-accent-fg);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        h1 {
+            font-size: 2em;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--color-border-muted);
+        }
+        h2 {
+            font-size: 1.5em;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--color-border-muted);
+        }
+        p, blockquote, ul, ol, dl, table, pre, details {
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        code {
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            white-space: break-spaces;
+            background-color: var(--color-canvas-subtle);
+            border-radius: 6px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        }
+        pre {
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background-color: var(--color-canvas-subtle);
+            border-radius: 6px;
+            border: 1px solid var(--color-border-muted);
+        }
+        pre code {
+            padding: 0;
+            background-color: transparent;
+            border: 0;
+            font-size: 100%;
+        }
+        table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            display: block;
+            width: max-content;
+            max-width: 100%;
+            overflow: auto;
+            margin-top: 0;
+            margin-bottom: 16px;
+        }
+        table th, table td {
+            padding: 6px 13px;
+            border: 1px solid var(--color-border-default);
+        }
+        table tr {
+            background-color: var(--color-canvas-default);
+            border-top: 1px solid var(--color-border-muted);
+        }
+        table tr:nth-child(2n) {
+            background-color: var(--color-canvas-subtle);
+        }
+        img {
+            max-width: 100%;
+            box-sizing: content-box;
+        }
+        hr {
+            height: 0.25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: var(--color-border-default);
+            border: 0;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 16px 0;
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+${htmlBody}
+<script>
+    document.querySelectorAll('pre code.language-mermaid').forEach(function(el) {
+        var pre = el.parentElement;
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = el.textContent;
+        pre.parentNode.replaceChild(div, pre);
+    });
+</script>
+</body>
+</html>"""
+
+        new File(targetDir, 'index.html').text = htmlPage
+    }
+}
+
+// Properties read by gradle/site-docs.gradle (siteDocsZip); must be set before it is applied.
+ext {
+    siteDocsTitle       = projectName
+    siteDocsSummary     = projectDescription
+    siteDocsGuideTask   = 'siteDocsGuide'
+    siteDocsApiTask     = 'javadoc'
+    siteDocsPublication = 'documentation'
+    siteDocsArtifactId  = rootProject.name
+    siteDocsTags        = ['Java', 'Spring Cloud Data Flow', 'Kubernetes', 'Mermaid', 'Streaming', 'Deployment']
+    siteDocsLicense     = 'Apache-2.0'
+    siteDocsSourceUrl   = "https://github.com/infosmid-org/${rootProject.name}".toString()
+}
+
+apply from: "$rootProject.projectDir/gradle/site-docs.gradle"

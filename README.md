@@ -1,8 +1,8 @@
 # Stream Deployer
 
-[![GitHub Release](https://img.shields.io/github/v/release/infosmid-org/stream-deployer)](https://github.com/infosmid-org/stream-deployer/releases)
-[![License](https://img.shields.io/github/license/infosmid-org/stream-deployer)](LICENSE)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/infosmid-org/stream-deployer/build-snapshot.yml?branch=main)](https://github.com/infosmid-org/stream-deployer/actions/workflows/build-snapshot.yml)
+[![Build Status](https://github.com/infosmid-org/stream-deployer/actions/workflows/snapshot.yml/badge.svg)](https://github.com/infosmid-org/stream-deployer/actions/workflows/snapshot.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/infosmid-org/stream-deployer)](https://github.com/infosmid-org/stream-deployer/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Stream Deployer creates Kubernetes manifests and Mermaid diagrams from Spring Cloud Data Flow stream definitions.
 It resolves stream bindings and injects communication channels and groups into container arguments.

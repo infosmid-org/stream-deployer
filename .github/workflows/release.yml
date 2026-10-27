@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
@@ -38,6 +39,11 @@ jobs:
 
       - name: Build and test
         run: ./gradlew build -PreleaseVersion=${{ steps.version.outputs.version }}
+
+      - name: Publish documentation to GitHub Packages
+        run: ./gradlew publishDocumentationPublicationToGitHubPackagesRepository -PreleaseVersion=${{ steps.version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release to GitHub Releases
         uses: ncipollo/release-action@v1
